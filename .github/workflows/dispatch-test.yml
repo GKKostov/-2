@@ -1,0 +1,46 @@
+name: Run Automatic Tests
+on:
+  repository_dispatch:
+    types: [run-tests]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      tests_repo: https://github.com/fmi-si/tests-homework-2
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Prepare
+        run: |
+          git config --global user.name "Automatic Tests"
+          git config --global user.email "automatic-tests@dev.null"
+
+          rm -rf test-results
+
+      - name: Make temporary directory
+        id: temp
+        run: |
+          echo "path="$(mktemp -d)"" >> $GITHUB_OUTPUT
+
+      - name: Download tests
+        run: |
+          git clone $tests_repo "${{ steps.temp.outputs.path }}"
+          chmod +x ${{ steps.temp.outputs.path }}/tests.sh
+
+      - name: Run tests
+        run: |
+          ${{ steps.temp.outputs.path }}/tests.sh ${{ steps.temp.outputs.path }}
+
+      - name: Upload results
+        if: success() || failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: results
+          path: test-results/
+
+      - name: Push results
+        if: success() || failure()
+        run: |
+          git add test-results
+          git commit -m "Automatic test results"
+          git push origin master

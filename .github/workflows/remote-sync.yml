@@ -1,0 +1,44 @@
+name: Remote Sync
+on:
+  repository_dispatch:
+    types: [remote-sync]
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    env:
+      original: https://github.com/fmi-si/homework-2
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Make Temporary Directory
+        id: directory
+        run: |
+          echo "temp="$(mktemp -d tmp.XXXXXXX)"" >> $GITHUB_OUTPUT
+
+      - name: Download Original Repository
+        run: |
+          git config --global user.name "Remote Sync"
+          git config --global user.email "remote-sync@users.noreply.github.com"
+          git clone $original "${{ steps.directory.outputs.temp }}"
+
+      - name: Copy the new files from the original repository
+        run: |
+          shopt -s dotglob
+          rm -rf "${{ steps.directory.outputs.temp }}"/.git
+          rm -rf "${{ steps.directory.outputs.temp }}"/.github
+          mv -f "${{ steps.directory.outputs.temp }}"/* ./
+          rm -rf "${{ steps.directory.outputs.temp }}"
+
+      - name: Check if there are any new files
+        id: clear
+        run: |
+          echo "working_tree_clear<<EOF" >> $GITHUB_OUTPUT
+          echo "$(git status --porcelain)" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Push changes
+        if: steps.clear.outputs.working_tree_clear != ''
+        run: |
+          git add .
+          git commit -m "Update repository from master"
+          git push origin master
